@@ -1,3 +1,9 @@
 node_modules/
 page-agent/
 learnML/
+
+# WXT
+.wxt/
+.output/
+stats.html
+*.zip
