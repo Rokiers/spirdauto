@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   PROVIDERS,
   getProvider,
@@ -15,14 +15,15 @@ export function SettingsPanel() {
   const [models, setModels] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<Status>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     loadConfig().then((c) => {
       setConfig(c);
-      const provider = getProvider(c.providerId);
-      const base = provider?.fallbackModels ?? [];
-      setModels(c.model && !base.includes(c.model) ? [c.model, ...base] : base);
+      if (c.apiKey.trim()) fetchModels(c);
     });
+    return () => abortRef.current?.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (!config) return <p className="hint">加载配置中…</p>;
@@ -31,33 +32,42 @@ export function SettingsPanel() {
     setConfig((prev) => (prev ? { ...prev, ...patch } : prev));
   }
 
-  function onProviderChange(providerId: string) {
-    const provider = getProvider(providerId);
-    setModels(provider?.fallbackModels ?? []);
-    update({ providerId, model: "" });
-    setStatus(null);
-  }
-
-  async function fetchModels() {
-    if (!config) return;
-    if (!config.apiKey.trim()) {
-      setStatus({ kind: "err", msg: "请先填写 API Key" });
-      return;
-    }
+  async function fetchModels(cfg: LLMConfig) {
+    if (!cfg.apiKey.trim()) return;
+    abortRef.current?.abort();
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
     setLoading(true);
     setStatus(null);
     try {
-      const list = await listModels(config);
+      const list = await listModels(
+        { providerId: cfg.providerId, apiKey: cfg.apiKey },
+        ctrl.signal,
+      );
       setModels(list);
-      update({ model: list.includes(config.model) ? config.model : (list[0] ?? "") });
-      setStatus({ kind: "ok", msg: `拉取到 ${list.length} 个模型` });
+      setConfig((prev) =>
+        prev
+          ? { ...prev, model: list.includes(prev.model) ? prev.model : (list[0] ?? "") }
+          : prev,
+      );
+      setStatus({ kind: "ok", msg: `已加载 ${list.length} 个模型` });
     } catch (e) {
-      const provider = getProvider(config.providerId);
-      setModels(provider?.fallbackModels ?? []);
-      setStatus({ kind: "err", msg: `拉取失败，已使用内置列表：${String(e)}` });
+      if (ctrl.signal.aborted) return;
+      setModels([]);
+      setConfig((prev) => (prev ? { ...prev, model: "" } : prev));
+      setStatus({ kind: "err", msg: `加载模型失败：${String(e)}` });
     } finally {
-      setLoading(false);
+      if (!ctrl.signal.aborted) setLoading(false);
     }
+  }
+
+  function onProviderChange(providerId: string) {
+    abortRef.current?.abort();
+    setModels([]);
+    setStatus(null);
+    const next = { ...config!, providerId, model: "" };
+    setConfig(next);
+    if (next.apiKey.trim()) fetchModels(next);
   }
 
   async function save() {
@@ -71,6 +81,12 @@ export function SettingsPanel() {
   }
 
   const provider = getProvider(config.providerId);
+
+  const modelPlaceholder = !config.apiKey.trim()
+    ? "先填 API Key"
+    : loading
+      ? "加载模型中…"
+      : "（无）";
 
   return (
     <section className="settings">
@@ -100,6 +116,7 @@ export function SettingsPanel() {
             value={config.apiKey}
             placeholder="sk-..."
             onChange={(e) => update({ apiKey: e.target.value })}
+            onBlur={() => fetchModels(config)}
           />
         </label>
         {provider && (
@@ -108,25 +125,21 @@ export function SettingsPanel() {
           </a>
         )}
 
-        <div className="form-row">
+        <label className="form-row">
           <span className="label">模型</span>
-          <div className="model-row">
-            <select
-              value={config.model}
-              onChange={(e) => update({ model: e.target.value })}
-            >
-              {models.length === 0 && <option value="">（无）</option>}
-              {models.map((m) => (
-                <option key={m} value={m}>
-                  {m}
-                </option>
-              ))}
-            </select>
-            <button onClick={fetchModels} disabled={loading}>
-              {loading ? "拉取中…" : "拉取模型"}
-            </button>
-          </div>
-        </div>
+          <select
+            value={config.model}
+            disabled={loading || models.length === 0}
+            onChange={(e) => update({ model: e.target.value })}
+          >
+            {models.length === 0 && <option value="">{modelPlaceholder}</option>}
+            {models.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+        </label>
 
         <div className="send-row">
           <button className="primary" onClick={save}>
@@ -139,3 +152,4 @@ export function SettingsPanel() {
     </section>
   );
 }
+
