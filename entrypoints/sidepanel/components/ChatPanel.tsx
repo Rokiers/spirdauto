@@ -3,6 +3,8 @@ import { loadConfig, runToolLoop, type ChatMessage } from "@/lib/llm";
 import { BROWSER_TOOLS, executeBrowserTool } from "@/lib/tools/browser";
 import { PAGE_TOOLS, PAGE_TOOL_NAMES, executePageTool } from "@/lib/tools/page";
 import { pcCall } from "@/lib/pc";
+import { saveFlow } from "@/lib/flow/store";
+import type { Flow, Step, Locator } from "@/lib/flow/types";
 
 const ALL_TOOLS = [...BROWSER_TOOLS, ...PAGE_TOOLS];
 
@@ -40,6 +42,10 @@ export function ChatPanel() {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+  const [recording, setRecording] = useState(false);
+  const [recordCount, setRecordCount] = useState(0);
+  const recordedRef = useRef<Step[]>([]);
+  const recordingRef = useRef(false);
   const listRef = useRef<HTMLDivElement>(null);
 
   function scrollToBottom() {
@@ -52,6 +58,79 @@ export function ChatPanel() {
   function appendMsg(m: ChatMessage) {
     setMessages((prev) => [...prev, m]);
     scrollToBottom();
+  }
+
+  function recordStep(name: string, argsJson: string, result: unknown) {
+    if (!recordingRef.current) return;
+    let a: Record<string, unknown> = {};
+    try {
+      a = JSON.parse(argsJson || "{}");
+    } catch {
+      /* ignore */
+    }
+    const res = result as { locator?: Locator };
+    let step: Step | null = null;
+    if (name === "click_element" && res?.locator) {
+      step = { type: "click", locator: res.locator, note: res.locator.text };
+    } else if (name === "input_text" && res?.locator) {
+      step = { type: "input", locator: res.locator, text: String(a.text ?? "") };
+    } else if (name === "scroll") {
+      step = {
+        type: "scroll",
+        down: a.down !== false,
+        numPages: Number(a.numPages ?? 0.7),
+      };
+    }
+    if (step) {
+      recordedRef.current.push(step);
+      setRecordCount(recordedRef.current.length);
+    }
+  }
+
+  function startRecording() {
+    recordedRef.current = [];
+    recordingRef.current = true;
+    setRecordCount(0);
+    setRecording(true);
+    setError("");
+  }
+
+  async function stopRecording() {
+    recordingRef.current = false;
+    setRecording(false);
+    const steps = recordedRef.current;
+    if (steps.length === 0) {
+      setError("没有录到任何可重播的动作（点击/输入/滚动）");
+      return;
+    }
+    const name = window.prompt(`给这个流程起个名字（共 ${steps.length} 步）`, "");
+    if (!name) return;
+
+    let domain = "";
+    let urlPattern = "";
+    try {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tab?.url) {
+        const u = new URL(tab.url);
+        domain = u.hostname;
+        urlPattern = u.origin + u.pathname;
+      }
+    } catch {
+      /* ignore */
+    }
+
+    const flow: Flow = {
+      id: crypto.randomUUID(),
+      name,
+      createdAt: Date.now(),
+      match: { domain, urlPattern },
+      steps,
+    };
+    await saveFlow(flow);
+    recordedRef.current = [];
+    setRecordCount(0);
+    setError("");
+    window.alert(`已保存流程「${name}」（${steps.length} 步）`);
   }
 
   async function send() {
@@ -82,6 +161,11 @@ export function ChatPanel() {
           if (step.kind === "assistant") {
             appendMsg(step.message);
           } else if (step.kind === "tool_result") {
+            recordStep(
+              step.call.function.name,
+              step.call.function.arguments,
+              step.result,
+            );
             appendMsg({
               role: "tool",
               tool_call_id: step.call.id,
@@ -142,10 +226,25 @@ export function ChatPanel() {
     <section className="chat">
       <div className="section-head">
         <h2>AI 对话</h2>
-        {messages.length > 0 && (
-          <button onClick={() => setMessages([])}>清空</button>
-        )}
+        <div className="chat-actions">
+          {recording ? (
+            <button className="recording" onClick={stopRecording}>
+              ● 停止录制 ({recordCount})
+            </button>
+          ) : (
+            <button onClick={startRecording}>录制流程</button>
+          )}
+          {messages.length > 0 && (
+            <button onClick={() => setMessages([])}>清空</button>
+          )}
+        </div>
       </div>
+
+      {recording && (
+        <div className="rec-banner">
+          录制中：AI 的点击/输入/滚动会被记录成流程，完成后点「停止录制」保存。
+        </div>
+      )}
 
       <div className="msg-list" ref={listRef}>
         {messages.length === 0 && (

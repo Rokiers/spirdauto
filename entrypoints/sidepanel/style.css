@@ -368,6 +368,58 @@ button:disabled {
     word-break: break-word;
 }
 
+.chat-actions {
+    display: flex;
+    gap: 6px;
+}
+
+button.recording {
+    border-color: var(--error-fg);
+    color: var(--error-fg);
+}
+
+.rec-banner {
+    padding: 6px 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    background: var(--error-bg);
+    color: var(--error-fg);
+}
+
+.flow-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.flow-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+}
+
+.flow-name {
+    font-weight: 600;
+}
+
+.flow-meta {
+    font-size: 11px;
+    color: var(--muted);
+}
+
+.flow-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
 /* tool calls */
 .assistant-turn {
     display: flex;

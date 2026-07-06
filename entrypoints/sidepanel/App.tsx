@@ -8,6 +8,7 @@ import {
 import { ChatPanel } from "./components/ChatPanel";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { PageControlTest } from "./components/PageControlTest";
+import { FlowPanel } from "./components/FlowPanel";
 
 async function send(req: Request): Promise<unknown> {
   return chrome.runtime.sendMessage(req);
@@ -71,7 +72,27 @@ function DataIcon() {
   );
 }
 
-type TabKey = "home" | "data" | "settings";
+function FlowIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="20"
+      height="20"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="3" y="3" width="6" height="6" rx="1" />
+      <rect x="15" y="15" width="6" height="6" rx="1" />
+      <path d="M9 6h6a3 3 0 0 1 3 3v6" />
+    </svg>
+  );
+}
+
+type TabKey = "home" | "flow" | "data" | "settings";
 
 export function App() {
   const [tabs, setTabs] = useState<TabInfo[]>([]);
@@ -177,6 +198,8 @@ export function App() {
           </>
         )}
 
+        {activeTab === "flow" && <FlowPanel />}
+
         {activeTab === "data" && (
           <section className="data">
             <div className="section-head">
@@ -196,6 +219,13 @@ export function App() {
         >
           <HomeIcon />
           <span>首页</span>
+        </button>
+        <button
+          className={activeTab === "flow" ? "tabbar-btn active" : "tabbar-btn"}
+          onClick={() => setActiveTab("flow")}
+        >
+          <FlowIcon />
+          <span>流程</span>
         </button>
         <button
           className={activeTab === "data" ? "tabbar-btn active" : "tabbar-btn"}
