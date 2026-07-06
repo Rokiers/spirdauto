@@ -1,14 +1,25 @@
 import { useRef, useState } from "react";
 import { loadConfig, runToolLoop, type ChatMessage } from "@/lib/llm";
 import { BROWSER_TOOLS, executeBrowserTool } from "@/lib/tools/browser";
+import { PAGE_TOOLS, PAGE_TOOL_NAMES, executePageTool } from "@/lib/tools/page";
+import { pcCall } from "@/lib/pc";
+
+const ALL_TOOLS = [...BROWSER_TOOLS, ...PAGE_TOOLS];
+
+async function executeTool(name: string, argsJson: string): Promise<unknown> {
+  if (PAGE_TOOL_NAMES.has(name)) return executePageTool(name, argsJson);
+  return executeBrowserTool(name, argsJson);
+}
 
 const SYSTEM_PROMPT: ChatMessage = {
   role: "system",
   content:
-    "你是浏览器助手，可调用工具查看和控制用户当前浏览器的标签页：" +
-    "list_tabs 列出所有标签页，get_current_page 获取当前活动页的标题/URL/主要标题，" +
-    "switch_tab 切换到指定标签页。切换前若不知道 tabId，先调用 list_tabs 获取。" +
-    "用中文简洁回答。",
+    "你是浏览器助手，可调用工具查看和控制用户当前浏览器。\n" +
+    "标签页级：list_tabs 列出所有标签页，get_current_page 获取当前页标题/URL，switch_tab 切换标签页。\n" +
+    "页面操作级：get_page_elements 读取当前页带[序号]的可交互元素，click_element 按序号点击，input_text 按序号输入，scroll 滚动。\n" +
+    "重要规则：要操作页面时，先调用 get_page_elements 拿到最新序号，再用 click_element/input_text；" +
+    "每次点击/输入/滚动/跳转后，页面会变、序号会重编，必须重新 get_page_elements 再继续。" +
+    "一次只做一个动作，做完观察结果。用中文简洁回答。",
 };
 
 function truncate(s: string, n = 200): string {
@@ -62,9 +73,11 @@ export function ChatPanel() {
     scrollToBottom();
 
     try {
+      await pcCall("showMask").catch(() => {});
       await runToolLoop(config, [SYSTEM_PROMPT, ...history], {
-        tools: BROWSER_TOOLS,
-        execute: executeBrowserTool,
+        tools: ALL_TOOLS,
+        execute: executeTool,
+        maxSteps: 15,
         onStep: (step) => {
           if (step.kind === "assistant") {
             appendMsg(step.message);
@@ -81,6 +94,7 @@ export function ChatPanel() {
     } catch (e) {
       setError(`请求失败：${String(e)}`);
     } finally {
+      await pcCall("hideMask").catch(() => {});
       setSending(false);
       scrollToBottom();
     }
