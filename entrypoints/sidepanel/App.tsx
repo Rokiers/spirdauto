@@ -7,6 +7,7 @@ import {
 } from "@/lib/messages";
 import { ChatPanel } from "./components/ChatPanel";
 import { SettingsPanel } from "./components/SettingsPanel";
+import { PageControlTest } from "./components/PageControlTest";
 
 async function send(req: Request): Promise<unknown> {
   return chrome.runtime.sendMessage(req);
@@ -117,6 +118,8 @@ export function App() {
         {activeTab === "home" && (
           <>
             <ChatPanel />
+
+            <PageControlTest />
 
             <section>
               <div className="section-head">

@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@page-agent/page-controller':
+        specifier: ^1.11.0
+        version: 1.11.0
       react:
         specifier: ^19.2.0
         version: 19.2.7
@@ -280,6 +283,9 @@ packages:
   '@oxc-project/types@0.138.0':
     resolution: {integrity: sha512-1a7ZKmrRTCoN1XMZ4L0PyyqrMnrNlLyPuOkdSX2MZg7IiIGRUyurNhAm73ptDOraoBcIordsIGKNPKUzy3ZmfA==}
 
+  '@page-agent/page-controller@1.11.0':
+    resolution: {integrity: sha512-DOG386ur+0yeC/jKECdGP97ugN+HDuyxPbmdvoUjMWpQcfIFh7QD+wIhdygKPWOvOnwzQxsehzf6IdVdlMQgfg==}
+
   '@pnpm/config.env-replace@1.1.0':
     resolution: {integrity: sha512-htyl8TWnKL7K/ESFa1oW2UB5lVDxuF5DpM7tBi6Hu2LNL3mWkIzNLG6N4zoCUP1lCKNxWy/3iu8mS8MvToGd6w==}
     engines: {node: '>=12.22.0'}
@@ -470,6 +476,9 @@ packages:
   adm-zip@0.5.18:
     resolution: {integrity: sha512-ufJnssQGbxzLNS1Ho9bCtX4rQKCCvoVuDLHoJyc3F9dOGDB4BkWs2Ci0kv53lqocAEQ/Cbi+I2XCsNYGqVYqng==}
     engines: {node: '>=12.0'}
+
+  ai-motion@0.4.8:
+    resolution: {integrity: sha512-9nQVjf8lrYQWSW0sZdb9bES4x8Ei1w9C0S62po2KvRbMjslmjm0WMeszyW771SEauDnu4YGWqurLZ/gCkCTosQ==}
 
   ansi-align@3.0.1:
     resolution: {integrity: sha512-IOfwwBF5iczOjp/WeY4YxyjqAFMQoZufdQWDd19SEExbVLNXqvpzSJ/M7Za4/sCPmQ0+GRquoA7bGcINcxew6w==}
@@ -1950,6 +1959,10 @@ snapshots:
 
   '@oxc-project/types@0.138.0': {}
 
+  '@page-agent/page-controller@1.11.0':
+    dependencies:
+      ai-motion: 0.4.8
+
   '@pnpm/config.env-replace@1.1.0': {}
 
   '@pnpm/network.ca-file@1.0.2':
@@ -2093,6 +2106,8 @@ snapshots:
   acorn@8.17.0: {}
 
   adm-zip@0.5.18: {}
+
+  ai-motion@0.4.8: {}
 
   ansi-align@3.0.1:
     dependencies:

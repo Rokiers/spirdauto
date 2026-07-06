@@ -20,8 +20,20 @@ export const Request = z.discriminatedUnion('type', [
   z.object({ type: z.literal('LIST_TABS') }),
   z.object({ type: z.literal('SWITCH_TAB'), tabId: z.number() }),
   z.object({ type: z.literal('GET_PAGE_INFO') }),
+  z.object({
+    type: z.literal('PC_CALL'),
+    method: z.string(),
+    args: z.record(z.string(), z.unknown()).optional(),
+  }),
 ]);
 export type Request = z.infer<typeof Request>;
+
+export const PcResponse = z.object({
+  ok: z.boolean(),
+  result: z.unknown().optional(),
+  error: z.string().optional(),
+});
+export type PcResponse = z.infer<typeof PcResponse>;
 
 export const ListTabsResponse = z.object({ tabs: z.array(TabInfo) });
 export type ListTabsResponse = z.infer<typeof ListTabsResponse>;

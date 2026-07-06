@@ -8,5 +8,11 @@ export default defineConfig({
     permissions: ['tabs', 'activeTab', 'scripting', 'storage', 'sidePanel'],
     host_permissions: ['<all_urls>'],
     action: {},
+    web_accessible_resources: [
+      {
+        resources: ['page-controller-world.js', 'chunks/*', 'assets/*'],
+        matches: ['<all_urls>'],
+      },
+    ],
   },
 });

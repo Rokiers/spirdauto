@@ -41,6 +41,21 @@ export default defineBackground(() => {
           sendResponse(info);
           return;
         }
+
+        if (req.type === 'PC_CALL') {
+          const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+          if (!tab?.id) {
+            sendResponse({ ok: false, error: '未找到活动标签页' });
+            return;
+          }
+          const res = await chrome.tabs.sendMessage(tab.id, {
+            type: 'PC_CALL',
+            method: req.method,
+            args: req.args,
+          });
+          sendResponse(res);
+          return;
+        }
       } catch (err) {
         sendResponse({ error: String(err) });
       }
