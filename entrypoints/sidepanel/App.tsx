@@ -9,6 +9,7 @@ import { ChatPanel } from "./components/ChatPanel";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { PageControlTest } from "./components/PageControlTest";
 import { FlowPanel } from "./components/FlowPanel";
+import { DataPanel } from "./components/DataPanel";
 
 async function send(req: Request): Promise<unknown> {
   return chrome.runtime.sendMessage(req);
@@ -200,14 +201,7 @@ export function App() {
 
         {activeTab === "flow" && <FlowPanel />}
 
-        {activeTab === "data" && (
-          <section className="data">
-            <div className="section-head">
-              <h2>已收集数据</h2>
-            </div>
-            <p className="hint">暂无数据。爬取到的字段将在这里预览并可导出 CSV/Excel。</p>
-          </section>
-        )}
+        {activeTab === "data" && <DataPanel />}
 
         {activeTab === "settings" && <SettingsPanel />}
       </main>

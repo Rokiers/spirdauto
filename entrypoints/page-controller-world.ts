@@ -137,6 +137,70 @@ export default defineUnlistedScript(() => {
     await sleep(120);
   }
 
+  // ---------- 数据提取 ----------
+  function simplifyHtml(root: Element, maxChars = 15000): string {
+    const KEEP_ATTR = ["class", "id", "href", "src", "role", "aria-label", "data-testid"];
+    const SKIP = new Set(["SCRIPT", "STYLE", "SVG", "NOSCRIPT", "PATH", "IFRAME", "CANVAS"]);
+    let out = "";
+
+    function walk(node: Node, depth: number) {
+      if (out.length > maxChars || depth > 12) return;
+      if (node.nodeType === Node.TEXT_NODE) {
+        const t = (node.textContent ?? "").trim();
+        if (t) out += " " + t.slice(0, 60);
+        return;
+      }
+      if (node.nodeType !== Node.ELEMENT_NODE) return;
+      const el = node as Element;
+      if (SKIP.has(el.tagName)) return;
+
+      const tag = el.tagName.toLowerCase();
+      let attrs = "";
+      for (const a of KEEP_ATTR) {
+        const v = el.getAttribute(a);
+        if (v) attrs += ` ${a}="${v.slice(0, 80)}"`;
+      }
+      out += `\n${"  ".repeat(Math.min(depth, 8))}<${tag}${attrs}>`;
+      for (const child of Array.from(el.childNodes)) walk(child, depth + 1);
+    }
+
+    walk(root, 0);
+    return out.slice(0, maxChars);
+  }
+
+  interface FieldSpec {
+    name: string;
+    selector?: string;
+    attr?: string;
+  }
+
+  function extractField(item: Element, f: FieldSpec): string {
+    const target = f.selector ? item.querySelector(f.selector) : item;
+    if (!target) return "";
+    if (!f.attr || f.attr === "text") return (target.textContent ?? "").trim();
+    if (f.attr === "href" || f.attr === "src") {
+      return (target as HTMLElement).getAttribute(f.attr) ?? "";
+    }
+    return target.getAttribute(f.attr) ?? "";
+  }
+
+  function extractList(itemSelector: string, fields: FieldSpec[], maxRows = 2000) {
+    let items: Element[] = [];
+    try {
+      items = Array.from(document.querySelectorAll(itemSelector));
+    } catch {
+      throw new Error(`itemSelector 非法: ${itemSelector}`);
+    }
+    const rows: Record<string, string>[] = [];
+    for (const item of items.slice(0, maxRows)) {
+      const row: Record<string, string> = {};
+      for (const f of fields) row[f.name] = extractField(item, f);
+      rows.push(row);
+    }
+    return { count: rows.length, sample: rows.slice(0, 3), rows };
+  }
+
+
   window.addEventListener("message", async (e: MessageEvent) => {
     if (e.source !== window) return;
     const data = e.data;
@@ -214,6 +278,23 @@ export default defineUnlistedScript(() => {
             (args?.down !== false ? 1 : -1);
           await domScroll(amount);
           result = { ok: true };
+          break;
+        }
+
+        // ---------- 数据提取 ----------
+        case "inspectHtml": {
+          const sel = args?.selector as string | undefined;
+          const root = sel
+            ? (document.querySelector(sel) ?? document.body)
+            : document.body;
+          result = { html: simplifyHtml(root) };
+          break;
+        }
+        case "extractList": {
+          result = extractList(
+            String(args?.itemSelector),
+            (args?.fields ?? []) as FieldSpec[],
+          );
           break;
         }
         default:

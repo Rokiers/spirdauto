@@ -4,7 +4,7 @@ import { BROWSER_TOOLS, executeBrowserTool } from "@/lib/tools/browser";
 import { PAGE_TOOLS, PAGE_TOOL_NAMES, executePageTool } from "@/lib/tools/page";
 import { pcCall } from "@/lib/pc";
 import { saveFlow } from "@/lib/flow/store";
-import type { Flow, Step, Locator } from "@/lib/flow/types";
+import type { Flow, Step, Locator, ExtractField } from "@/lib/flow/types";
 
 const ALL_TOOLS = [...BROWSER_TOOLS, ...PAGE_TOOLS];
 
@@ -19,8 +19,9 @@ const SYSTEM_PROMPT: ChatMessage = {
     "你是浏览器助手，可调用工具查看和控制用户当前浏览器。\n" +
     "标签页级：list_tabs 列出所有标签页，get_current_page 获取当前页标题/URL，switch_tab 切换标签页。\n" +
     "页面操作级：get_page_elements 读取当前页带[序号]的可交互元素，click_element 按序号点击，input_text 按序号输入，scroll 滚动。\n" +
-    "重要规则：要操作页面时，先调用 get_page_elements 拿到最新序号，再用 click_element/input_text；" +
-    "每次点击/输入/滚动/跳转后，页面会变、序号会重编，必须重新 get_page_elements 再继续。" +
+    "数据提取：inspect_html 查看页面结构（含 class/标签），extract_list 从重复列表提取字段并存入数据集。\n" +
+    "操作规则：要点击/输入前先 get_page_elements 拿最新序号；页面变化后要重新读。\n" +
+    "提取规则：要抓列表数据时，先用 inspect_html 看结构，确定每条数据的 itemSelector 和各字段的相对选择器/取值方式（text/href/src），再调用 extract_list。数据会自动存入数据集。\n" +
     "一次只做一个动作，做完观察结果。用中文简洁回答。",
 };
 
@@ -79,6 +80,12 @@ export function ChatPanel() {
         type: "scroll",
         down: a.down !== false,
         numPages: Number(a.numPages ?? 0.7),
+      };
+    } else if (name === "extract_list") {
+      step = {
+        type: "extract",
+        itemSelector: String(a.itemSelector ?? ""),
+        fields: Array.isArray(a.fields) ? (a.fields as ExtractField[]) : [],
       };
     }
     if (step) {

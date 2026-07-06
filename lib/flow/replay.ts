@@ -1,4 +1,5 @@
 import { pcCall } from "@/lib/pc";
+import { appendRows, type DataRow } from "@/lib/data/store";
 import type { Flow, Step } from "./types";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -24,6 +25,12 @@ export async function replayFlow(
           await pcCall("replayInput", { locator: step.locator, text: step.text });
         } else if (step.type === "scroll") {
           await pcCall("replayScroll", { down: step.down, numPages: step.numPages });
+        } else if (step.type === "extract") {
+          const res = (await pcCall("extractList", {
+            itemSelector: step.itemSelector,
+            fields: step.fields,
+          })) as { rows: DataRow[] };
+          await appendRows(res.rows);
         }
       } catch (e) {
         handlers.onError?.(i, step, String(e));
