@@ -193,7 +193,7 @@ export async function runToolLoop(
         autoContinue,
         emptyStrikes,
       });
-      if (autoContinue && emptyStrikes < 3) {
+      if (autoContinue && emptyStrikes < 3 && !signal?.aborted) {
         emptyStrikes++;
         console.log(`[runToolLoop] 自动继续 #${emptyStrikes}`);
         history.push({
@@ -228,6 +228,18 @@ export async function runToolLoop(
         name: call.function.name,
         content: JSON.stringify(result),
       });
+
+      // done 工具 = 正常结束
+      if (call.function.name === "done") {
+        console.log("[runToolLoop] 模型调用了 done，正常结束");
+        return { messages: history, text: "（已完成）" };
+      }
+
+      // 用户手动停止（signal aborted）
+      if (signal?.aborted) {
+        console.log("[runToolLoop] 已中止");
+        return { messages: history, text: "（已中止）" };
+      }
     }
   }
 }

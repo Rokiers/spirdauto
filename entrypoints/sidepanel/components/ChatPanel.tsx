@@ -62,6 +62,7 @@ export function ChatPanel() {
   const stepCountRef = useRef(0);
   const stopReasonRef = useRef("");
   const [stopReason, setStopReason] = useState("");
+  const abortRef = useRef<AbortController | null>(null);
 
   function scrollToBottom() {
     requestAnimationFrame(() => {
@@ -121,6 +122,7 @@ export function ChatPanel() {
   }
 
   function startRecording() {
+    abortRef.current?.abort();
     recordedRef.current = [];
     recordingRef.current = true;
     setRecordCount(0);
@@ -131,6 +133,7 @@ export function ChatPanel() {
   async function stopRecording() {
     recordingRef.current = false;
     setRecording(false);
+    abortRef.current?.abort();  // 停止当前正在跑的循环
     const steps = recordedRef.current;
     if (steps.length === 0) {
       setError("没有录到任何动作");
@@ -196,10 +199,13 @@ export function ChatPanel() {
       stepCountRef.current = 0;
       setStopReason("");
       const doRecord = recordingRef.current;
+      const abort = new AbortController();
+      abortRef.current = abort;
       console.log("[ChatPanel] send", { doRecord });
       const result = await runToolLoop(config, [SYSTEM_PROMPT, ...history], {
         tools: ALL_TOOLS,
         execute: executeTool,
+        signal: abort.signal,
         requireTools: doRecord,
         autoContinue: doRecord,
         onStep: (step) => {
@@ -228,6 +234,7 @@ export function ChatPanel() {
     } catch (e) {
       setError(`请求失败：${String(e)}`);
     } finally {
+      abortRef.current = null;
       await pcCall("hideMask").catch(() => {});
       setSending(false);
       scrollToBottom();
