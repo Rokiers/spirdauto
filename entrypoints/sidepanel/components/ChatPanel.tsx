@@ -255,32 +255,22 @@ export function ChatPanel() {
 
   return (
     <section className="chat">
-      <div className="section-head">
-        <h2>AI 对话</h2>
-        <div className="chat-actions">
-          {recording ? (
-            <button className="recording" onClick={stopRecording}>
-              ● 停止录制 ({recordCount})
-            </button>
-          ) : (
-            <button onClick={startRecording}>录制流程</button>
-          )}
-          {messages.length > 0 && (
-            <button onClick={() => setMessages([])}>清空</button>
-          )}
-        </div>
+      <div className="chat-actions">
+        {messages.length > 0 && (
+          <button onClick={() => setMessages([])}>清空</button>
+        )}
       </div>
 
       {recording && (
         <div className="rec-banner">
-          录制中：AI 的点击/输入/滚动会被记录成流程，完成后点「停止录制」保存。
+          录制中：AI 的点击/输入/滚动/提取会被记录成流程，完成后点「停止录制」保存。
         </div>
       )}
 
       <div className="msg-list" ref={listRef}>
         {messages.length === 0 && (
           <p className="hint">
-            试试「列出我打开的所有标签页」或「切换到某个标签页」。
+            打开一个网页，让 AI 分析页面并提取数据。
           </p>
         )}
         {messages.map(renderMsg)}
@@ -294,12 +284,16 @@ export function ChatPanel() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={onKeyDown}
-          placeholder="输入消息，Enter 发送 / Shift+Enter 换行"
-          rows={2}
+          placeholder="输入消息，Enter 发送"
+          rows={1}
         />
-        <button className="primary" onClick={send} disabled={sending}>
-          发送
-        </button>
+        {recording ? (
+          <button className="recording" onClick={stopRecording}>
+            ● 停止 ({recordCount})
+          </button>
+        ) : (
+          <button className="primary" onClick={startRecording}>录制</button>
+        )}
       </div>
     </section>
   );
