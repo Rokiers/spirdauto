@@ -77,12 +77,20 @@ export default defineUnlistedScript(() => {
         if (uniq(sel)) return { strategy: "css", value: sel, text };
       }
     }
-    return { strategy: "css", value: cssPath(el), text };
+    const path = cssPath(el);
+    // 如果 css path 太泛（只剩一个标签名如 "div" 或 "span"），
+    // 且元素有文本内容，改用文本策略定位
+    const isVague = /^[a-z]+$/.test(path); // e.g. just "div" or "span"
+    if (isVague && text) {
+      return { strategy: "css", value: path, text };
+    }
+    return { strategy: "css", value: path, text };
   }
 
   function resolveLocator(loc: {
     strategy: string;
     value: string;
+    text?: string;
   }): HTMLElement | null {
     if (!loc || !loc.value) return null;
     if (loc.strategy === "css") {
@@ -93,11 +101,18 @@ export default defineUnlistedScript(() => {
       }
     }
     if (loc.strategy === "text") {
-      const all = document.querySelectorAll(
-        'a,button,[role="button"],[role="link"],input',
-      );
+      // 扩大到所有元素，不仅限 a/button/input
+      const all = document.querySelectorAll("*");
       for (const n of all) {
-        if ((n.textContent ?? "").trim() === loc.value) return n as HTMLElement;
+        if ((n.textContent ?? "").trim() === loc.value) {
+          return n as HTMLElement;
+        }
+      }
+      // 宽松匹配：包含文本
+      for (const n of all) {
+        if ((n.textContent ?? "").trim().includes(loc.value)) {
+          return n as HTMLElement;
+        }
       }
     }
     return null;
@@ -109,6 +124,8 @@ export default defineUnlistedScript(() => {
     fn: () => Promise<T>,
   ): Promise<{ result: T; element: Element | null }> {
     let captured: Element | null = null;
+    let beforeEl = document.activeElement as Element;
+    // 记录操作前被 focus 的元素作为兜底
     const cap = (e: Event) => {
       const t = e.target as Element;
       if (t && t.nodeType === 1 && !captured) captured = t;
@@ -117,7 +134,9 @@ export default defineUnlistedScript(() => {
     return fn().then(
       (result) => {
         types.forEach((t) => document.removeEventListener(t, cap, true));
-        return { result, element: captured };
+        // 兜底：如果没捕获到，用操作前的 activeElement
+        const el = captured || beforeEl;
+        return { result, element: el !== document.body ? el : null };
       },
       (err) => {
         types.forEach((t) => document.removeEventListener(t, cap, true));

@@ -16,21 +16,24 @@ async function executeTool(name: string, argsJson: string): Promise<unknown> {
 const SYSTEM_PROMPT: ChatMessage = {
   role: "system",
   content:
-    "你是爬虫录制助手。你的任务是分析页面结构和网络请求，构建可复用的采集方案，而不是执行采集循环本身。\n" +
+    "你是爬虫录制助手。你的任务是分析页面结构和网络请求，构建可复用的采集方案。\n" +
     "\n" +
     "工作流程：\n" +
-    "1. 用 get_page_elements / inspect_html 了解页面结构\n" +
-    "2. 如果需要找数据接口：start_intercept → 滚动/操作触发请求 → stop_intercept → get_intercepted 查看请求列表\n" +
-    "3. 构造采集方案：\n" +
-    "   - 页面数据用 extract_list(itemSelector, fields)\n" +
-    "   - 接口数据用 fetch_json(endpointUrl, responseMapper, ...)\n" +
-    "4. 方案产出后调用 run_flow_test(flowJson) 验证数据是否正确，不对则调整\n" +
+    "1. 用 get_page_elements / inspect_html 了解页面结构和加载方式\n" +
+    "2. 如果页面有分页器：识别下一页按钮，然后逐页点击+提取，直到最后一页\n" +
+    "3. 如果页面是无限滚动：使用 scroll 滚动加载更多\n" +
+    "4. 提取数据：extract_list(itemSelector, fields)\n" +
     "\n" +
-    "关键规则：\n" +
-    "- 数据必须通过 extract_list / fetch_json 收集，禁止直接读取文本罗列数值\n" +
-    "- 一次只做一个动作，做完观察结果\n" +
-    "- 遇到无限滚动列表：用 inspect_html 看结构 → 写 extract_list 试提取 → 确认选择器正确后告知用户\n" +
-    "- 用中文简洁回答",
+    "★ 翻页纪律（最高优先级）：\n" +
+    "- 每翻一页后立即 extract_list，然后继续翻下一页\n" +
+    "- 不要在中途停下来报告\"已抓了几页\"——继续翻直到检测不到下一页或达到最后一页\n" +
+    "- 发现\"下一页\"按钮消失了/变灰了，才是翻页结束\n" +
+    "- 分页数未知时，不停翻直到尽头\n" +
+    "\n" +
+    "数据纪律：\n" +
+    "- 数据必须通过 extract_list 收集，禁止直接读取文本罗列数值\n" +
+    "- 一次只做一个动作\n" +
+    "- 用中文简洁回答。不要重复汇报进度，继续执行直到任务完成。",
 };
 
 function truncate(s: string, n = 200): string {
@@ -263,7 +266,7 @@ export function ChatPanel() {
 
       {recording && (
         <div className="rec-banner">
-          录制中：AI 的点击/输入/滚动/提取会被记录成流程，完成后点「停止录制」保存。
+          ● 录制中 · 已记录 {recordCount} 步 · 点「停止」保存流程
         </div>
       )}
 
