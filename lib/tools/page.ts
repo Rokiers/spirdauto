@@ -1,6 +1,8 @@
 import type { ToolDef } from "@/lib/llm";
 import { pcCall } from "@/lib/pc";
-import { appendRows, type DataRow } from "@/lib/data/store";
+import { appendRows, loadDataset, clearDataset, type DataRow } from "@/lib/data/store";
+import { Flow } from "@/lib/flow/types";
+import { replayFlow } from "@/lib/flow/replay";
 
 interface BrowserState {
   url: string;
@@ -110,6 +112,72 @@ export const PAGE_TOOLS: ToolDef[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "start_intercept",
+      description: "开启网络请求拦截，开始捕获页面的 fetch/XHR 请求。录制时用于发现数据接口。",
+      parameters: { type: "object", properties: {}, required: [] },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "stop_intercept",
+      description: "停止网络请求拦截。",
+      parameters: { type: "object", properties: {}, required: [] },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_intercepted",
+      description:
+        "查看拦截到的网络请求列表（去重后），含 URL、方法、状态码、响应大小和预览。" +
+        "用于分析哪些请求是数据接口（JSON 响应、XHR 触发、分页参数等）。",
+      parameters: { type: "object", properties: {}, required: [] },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "fetch_json",
+      description:
+        "按分页参数循环请求接口端点，用路径映射提取字段存入数据集。使用前先用 get_intercepted 分析接口。" +
+        "endpointUrl 中用 $1 占位分页参数值；responseMapper 是 {字段名: json路径} 的映射。" +
+        "stopWhen 为 empty(返回空停)/error(出错停)/noNew(无新数据停)。数据会自动入库。",
+      parameters: {
+        type: "object",
+        properties: {
+          endpointUrl: { type: "string", description: "接口 URL，$1 为分页参数占位符" },
+          paramStart: { type: "number", description: "分页参数起始值" },
+          paramStep: { type: "number", description: "分页参数步长" },
+          stopWhen: { type: "string", description: "停止条件：empty/error/noNew" },
+          maxPages: { type: "number", description: "安全上限（默认200）" },
+          responseMapper: {
+            type: "object",
+            description: "{字段名: json路径}，如 {\"name\": \"data.items.0.name\"}",
+          },
+        },
+        required: ["endpointUrl", "responseMapper"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "run_flow_test",
+      description:
+        "运行一个已构造的 Flow（JSON），返回结果样本用于自校验。教学阶段 AI 产出流程后调用此工具验证数据是否正确。",
+      parameters: {
+        type: "object",
+        properties: {
+          flowJson: { type: "string", description: "Flow 的 JSON 字符串" },
+        },
+        required: ["flowJson"],
+      },
+    },
+  },
 ];
 
 export const PAGE_TOOL_NAMES = new Set(PAGE_TOOLS.map((t) => t.function.name));
@@ -134,7 +202,7 @@ export async function executePageTool(
         url: s.url,
         title: s.title,
         header: s.header,
-        elements: s.content,
+        elements: (s.content || "").slice(0, 8000),
         footer: s.footer,
       };
     }
@@ -169,6 +237,48 @@ export async function executePageTool(
       })) as { count: number; sample: DataRow[]; rows: DataRow[] };
       await appendRows(res.rows);
       return { count: res.count, sample: res.sample, saved: true };
+    }
+    case "start_intercept": {
+      return await pcCall("startIntercept");
+    }
+    case "stop_intercept": {
+      return await pcCall("stopIntercept");
+    }
+    case "get_intercepted": {
+      return await pcCall("getIntercepted");
+    }
+    case "fetch_json": {
+      const res = (await pcCall("fetchJson", {
+        endpointUrl: String(args.endpointUrl ?? ""),
+        paramStart: Number(args.paramStart ?? 0),
+        paramStep: Number(args.paramStep ?? 1),
+        stopWhen: String(args.stopWhen ?? "empty"),
+        maxPages: Number(args.maxPages ?? 200),
+        responseMapper: args.responseMapper ?? {},
+      })) as { count: number; sample: DataRow[]; rows: DataRow[] };
+      await appendRows(res.rows);
+      return { count: res.count, sample: res.sample, saved: true };
+    }
+    case "run_flow_test": {
+      let flow: Flow;
+      try {
+        const parsed = JSON.parse(String(args.flowJson ?? "{}"));
+        flow = Flow.parse(parsed);
+      } catch {
+        return { error: "Flow JSON 格式不合法，请检查步骤结构" };
+      }
+      await clearDataset();
+      const result = await replayFlow(flow, {
+        onStep: () => {},
+        onError: (i, s, e) => console.warn(`[run_flow_test] 步${i} ${s.type} 失败:`, e),
+      });
+      const rows = await loadDataset();
+      return {
+        ok: result.ok,
+        failedAt: result.failedAt,
+        totalRows: rows.length,
+        sample: rows.slice(0, 5),
+      };
     }
     default:
       throw new Error(`未知页面工具: ${name}`);

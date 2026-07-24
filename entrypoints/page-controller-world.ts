@@ -281,7 +281,208 @@ export default defineUnlistedScript(() => {
           break;
         }
 
-        // ---------- 数据提取 ----------
+  // ---------- 网络拦截 ----------
+  interface InterceptedRequest {
+    url: string;
+    method: string;
+    requestHeaders: Record<string, string>;
+    requestBody: string | null;
+    responseStatus: number;
+    responseHeaders: Record<string, string>;
+    responseBody: string | null;
+    timestamp: number;
+  }
+
+  let intercepted: InterceptedRequest[] = [];
+  let intercepting = false;
+  let _origFetch: typeof fetch | null = null;
+  let _origXhrOpen: typeof XMLHttpRequest.prototype.open | null = null;
+  let _origXhrSend: typeof XMLHttpRequest.prototype.send | null = null;
+
+  function startIntercept() {
+    if (intercepting) return;
+    intercepting = true;
+    intercepted = [];
+
+    _origFetch = window.fetch;
+    window.fetch = async function (...args: Parameters<typeof fetch>) {
+      const [url, init] = args;
+      const start = Date.now();
+      let resp: Response;
+      try {
+        resp = await _origFetch!.apply(this, args as [RequestInfo | URL, RequestInit?]);
+      } catch {
+        intercepted.push({
+          url: String(url),
+          method: init?.method || "GET",
+          requestHeaders: {},
+          requestBody: null,
+          responseStatus: 0,
+          responseHeaders: {},
+          responseBody: null,
+          timestamp: Date.now() - start,
+        });
+        throw new Error("fetch intercepted error");
+      }
+      const clone = resp.clone();
+      let body: string | null = null;
+      try {
+        body = await clone.text();
+      } catch {
+        /* ignore */
+      }
+      const hdr: Record<string, string> = {};
+      resp.headers.forEach((v, k) => { hdr[k] = v; });
+      intercepted.push({
+        url: String(url),
+        method: init?.method || "GET",
+        requestHeaders: (init?.headers instanceof Headers
+          ? Object.fromEntries(init.headers.entries())
+          : (init?.headers as Record<string, string>) || {}),
+        requestBody: null,
+        responseStatus: resp.status,
+        responseHeaders: hdr,
+        responseBody: body?.slice(0, 50000) ?? null,
+        timestamp: Date.now() - start,
+      });
+      return resp;
+    };
+
+    _origXhrOpen = XMLHttpRequest.prototype.open;
+    _origXhrSend = XMLHttpRequest.prototype.send;
+    XMLHttpRequest.prototype.open = function (
+      method: string,
+      url: string | URL,
+      async = true,
+      user?: string | null,
+      password?: string | null,
+    ) {
+      (this as any).__spird = { method, url: String(url), start: Date.now(), headers: {} };
+      return _origXhrOpen!.call(this, method, url, async as boolean, user, password);
+    };
+    XMLHttpRequest.prototype.send = function (body?: Document | XMLHttpRequestBodyInit | null) {
+      const xhr = this as any;
+      const oldO = xhr.onreadystatechange;
+      xhr.addEventListener("readystatechange", () => {
+        if (xhr.readyState === 4) {
+          let respBody: string | null = null;
+          try { respBody = (xhr as XMLHttpRequest).responseText?.slice(0, 50000) ?? null; } catch { /* */ }
+          const hdr: Record<string, string> = {};
+          try {
+            (xhr as XMLHttpRequest).getAllResponseHeaders()
+              .split("\r\n")
+              .forEach((l: string) => {
+                const [k, v] = l.split(": ");
+                if (k) hdr[k] = v || "";
+              });
+          } catch { /* */ }
+          intercepted.push({
+            url: xhr.__spird?.url || "",
+            method: xhr.__spird?.method || "GET",
+            requestHeaders: xhr.__spird?.headers || {},
+            requestBody: body ? String(body).slice(0, 10000) : null,
+            responseStatus: (xhr as XMLHttpRequest).status,
+            responseHeaders: hdr,
+            responseBody: respBody,
+            timestamp: Date.now() - (xhr.__spird?.start || Date.now()),
+          });
+        }
+      });
+      if (oldO) xhr.onreadystatechange = oldO;
+      return _origXhrSend!.call(this, body);
+    };
+  }
+
+  function stopIntercept() {
+    intercepting = false;
+    if (_origFetch) { window.fetch = _origFetch; _origFetch = null; }
+    if (_origXhrOpen) { XMLHttpRequest.prototype.open = _origXhrOpen; _origXhrOpen = null; }
+    if (_origXhrSend) { XMLHttpRequest.prototype.send = _origXhrSend; _origXhrSend = null; }
+  }
+
+  function getIntercepted() {
+    const deduped: InterceptedRequest[] = [];
+    const seen = new Set<string>();
+    for (const r of intercepted) {
+      const key = r.url + r.method;
+      if (!seen.has(key)) { seen.add(key); deduped.push(r); }
+    }
+    return deduped.map((r) => ({
+      url: r.url,
+      method: r.method,
+      status: r.responseStatus,
+      contentType: r.responseHeaders["content-type"] || "",
+      bodyPreview: (r.responseBody || "").slice(0, 500),
+      size: (r.responseBody || "").length,
+      time: r.timestamp,
+    }));
+  }
+
+  async function fetchJson(
+    endpointUrl: string,
+    paramStart: number,
+    paramStep: number,
+    stopWhen: string,
+    maxPages: number,
+    responseMapper: Record<string, string>,
+  ) {
+    const rows: Record<string, string>[] = [];
+    let param = paramStart;
+    const limit = maxPages > 0 ? maxPages : 200;
+    for (let p = 0; p < limit; p++) {
+      const url = endpointUrl.replace(/\$1/g, String(param));
+      let res: Response;
+      try {
+        res = await window.fetch(url, { credentials: "include" });
+      } catch {
+        if (stopWhen === "error") break;
+        throw new Error(`请求失败: ${url}`);
+      }
+      if (!res.ok) {
+        if (stopWhen === "error") break;
+        throw new Error(`HTTP ${res.status}: ${url}`);
+      }
+      const data = await res.json();
+      const mapped = resolveJsonPaths(data, responseMapper);
+      if (mapped.length === 0 && stopWhen === "empty") break;
+      for (const row of mapped) rows.push(row);
+      param += paramStep;
+    }
+    return { count: rows.length, sample: rows.slice(0, 3), rows };
+  }
+
+  function resolveJsonPaths(
+    data: unknown,
+    mapper: Record<string, string>,
+  ): Record<string, string>[] {
+    const arrayPath = Object.values(mapper)[0] || "";
+    const prefix = arrayPath.replace(/\.[^.]+$/, "");
+    let arr: unknown[] = [];
+    if (prefix) {
+      const parts = prefix.split(".");
+      let node: any = data;
+      for (const p of parts) {
+        if (node == null) break;
+        node = Array.isArray(node) ? node[0]?.[p] : node[p];
+      }
+      arr = Array.isArray(node) ? node : [];
+    } else {
+      arr = Array.isArray(data) ? data : [];
+    }
+
+    return arr.map((item: any) => {
+      const row: Record<string, string> = {};
+      for (const [fieldName, path] of Object.entries(mapper)) {
+        const leaf = path.split(".").pop() || path;
+        let value: any = item;
+        const fieldPath = path.replace(prefix ? prefix + "." : "", "");
+        for (const seg of fieldPath.split(".")) value = value?.[seg];
+        row[fieldName] = value != null ? String(value) : "";
+      }
+      return row;
+    });
+  }
+
         case "inspectHtml": {
           const sel = args?.selector as string | undefined;
           const root = sel
@@ -297,6 +498,29 @@ export default defineUnlistedScript(() => {
           );
           break;
         }
+
+        // ---------- 网络拦截 ----------
+        case "startIntercept":
+          startIntercept();
+          result = { ok: true };
+          break;
+        case "stopIntercept":
+          stopIntercept();
+          result = { ok: true };
+          break;
+        case "getIntercepted":
+          result = { requests: getIntercepted() };
+          break;
+        case "fetchJson":
+          result = await fetchJson(
+            String(args?.endpointUrl),
+            Number(args?.paramStart ?? 0),
+            Number(args?.paramStep ?? 1),
+            String(args?.stopWhen ?? "empty"),
+            Number(args?.maxPages ?? 200),
+            (args?.responseMapper ?? {}) as Record<string, string>,
+          );
+          break;
         default:
           throw new Error(`未知方法: ${method}`);
       }

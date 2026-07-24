@@ -23,6 +23,42 @@ export const Step = z.discriminatedUnion("type", [
     itemSelector: z.string(),
     fields: z.array(ExtractField),
   }),
+  z.object({
+    type: z.literal("fetchJson"),
+    endpointUrl: z.string(),
+    paramStart: z.number().default(0),
+    paramStep: z.number().default(1),
+    stopWhen: z.enum(["empty", "error", "noNew"]).default("empty"),
+    maxPages: z.number().default(200),
+    responseMapper: z.record(z.string(), z.string()),
+    dedupKey: z.string().optional(),
+  }),
+  z.object({
+    type: z.literal("scrollCollect"),
+    itemSelector: z.string(),
+    fields: z.array(ExtractField),
+    dedupKey: z.string().optional(),
+    triggerDown: z.boolean().default(true),
+    triggerPages: z.number().default(0.7),
+    maxScrolls: z.number().default(50),
+    waitMs: z.number().default(800),
+  }),
+  z.object({
+    type: z.literal("paginate"),
+    urlTemplate: z.string().optional(),
+    nextLocator: Locator.optional(),
+    fields: z.array(ExtractField).optional(),
+    itemSelector: z.string().optional(),
+    maxPages: z.number().default(50),
+    untilSelectorGone: z.string().optional(),
+  }),
+  z.object({
+    type: z.literal("forEachPage"),
+    urlSelector: z.string(),
+    urlAttr: z.string().default("href"),
+    fields: z.array(ExtractField),
+    itemSelector: z.string(),
+  }),
 ]);
 export type Step = z.infer<typeof Step>;
 

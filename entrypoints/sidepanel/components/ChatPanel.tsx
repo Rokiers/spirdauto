@@ -16,13 +16,21 @@ async function executeTool(name: string, argsJson: string): Promise<unknown> {
 const SYSTEM_PROMPT: ChatMessage = {
   role: "system",
   content:
-    "你是浏览器助手，可调用工具查看和控制用户当前浏览器。\n" +
-    "标签页级：list_tabs 列出所有标签页，get_current_page 获取当前页标题/URL，switch_tab 切换标签页。\n" +
-    "页面操作级：get_page_elements 读取当前页带[序号]的可交互元素，click_element 按序号点击，input_text 按序号输入，scroll 滚动。\n" +
-    "数据提取：inspect_html 查看页面结构（含 class/标签），extract_list 从重复列表提取字段并存入数据集。\n" +
-    "操作规则：要点击/输入前先 get_page_elements 拿最新序号；页面变化后要重新读。\n" +
-    "提取规则：要抓列表数据时，先用 inspect_html 看结构，确定每条数据的 itemSelector 和各字段的相对选择器/取值方式（text/href/src），再调用 extract_list。数据会自动存入数据集。\n" +
-    "一次只做一个动作，做完观察结果。用中文简洁回答。",
+    "你是爬虫录制助手。你的任务是分析页面结构和网络请求，构建可复用的采集方案，而不是执行采集循环本身。\n" +
+    "\n" +
+    "工作流程：\n" +
+    "1. 用 get_page_elements / inspect_html 了解页面结构\n" +
+    "2. 如果需要找数据接口：start_intercept → 滚动/操作触发请求 → stop_intercept → get_intercepted 查看请求列表\n" +
+    "3. 构造采集方案：\n" +
+    "   - 页面数据用 extract_list(itemSelector, fields)\n" +
+    "   - 接口数据用 fetch_json(endpointUrl, responseMapper, ...)\n" +
+    "4. 方案产出后调用 run_flow_test(flowJson) 验证数据是否正确，不对则调整\n" +
+    "\n" +
+    "关键规则：\n" +
+    "- 数据必须通过 extract_list / fetch_json 收集，禁止直接读取文本罗列数值\n" +
+    "- 一次只做一个动作，做完观察结果\n" +
+    "- 遇到无限滚动列表：用 inspect_html 看结构 → 写 extract_list 试提取 → 确认选择器正确后告知用户\n" +
+    "- 用中文简洁回答",
 };
 
 function truncate(s: string, n = 200): string {
@@ -87,6 +95,15 @@ export function ChatPanel() {
         itemSelector: String(a.itemSelector ?? ""),
         fields: Array.isArray(a.fields) ? (a.fields as ExtractField[]) : [],
       };
+    } else if (name === "fetch_json") {
+      step = {
+        type: "fetchJson",
+        endpointUrl: String(a.endpointUrl ?? ""),
+        paramStart: Number(a.paramStart ?? 0),
+        paramStep: Number(a.paramStep ?? 1),
+        stopWhen: (a.stopWhen as "empty" | "error" | "noNew") ?? "empty",
+        responseMapper: (a.responseMapper ?? {}) as Record<string, string>,
+      } as Step;
     }
     if (step) {
       recordedRef.current.push(step);
@@ -107,7 +124,14 @@ export function ChatPanel() {
     setRecording(false);
     const steps = recordedRef.current;
     if (steps.length === 0) {
-      setError("没有录到任何可重播的动作（点击/输入/滚动）");
+      setError("没有录到任何动作");
+      return;
+    }
+    const hasData = steps.some((s) =>
+      ["extract", "fetchJson", "scrollCollect", "paginate", "forEachPage"].includes(s.type),
+    );
+    if (!hasData) {
+      setError("未录到数据采集步骤（extract/fetchJson/scollCollect 等），重播不会产出数据");
       return;
     }
     const name = window.prompt(`给这个流程起个名字（共 ${steps.length} 步）`, "");
@@ -163,7 +187,7 @@ export function ChatPanel() {
       await runToolLoop(config, [SYSTEM_PROMPT, ...history], {
         tools: ALL_TOOLS,
         execute: executeTool,
-        maxSteps: 15,
+        maxSteps: recording ? 0 : 15,  // 录制时不限步数
         onStep: (step) => {
           if (step.kind === "assistant") {
             appendMsg(step.message);

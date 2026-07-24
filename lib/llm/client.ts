@@ -119,6 +119,30 @@ async function postChat(
   };
 }
 
+export function trimHistory(msgs: ChatMessage[]): ChatMessage[] {
+  const BIG_PAGE_TOOLS = new Set(["get_page_elements", "inspect_html", "get_intercepted"]);
+  let latestBigIndex = -1;
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    const m = msgs[i];
+    if (m.role === "tool" && m.name && BIG_PAGE_TOOLS.has(m.name)) {
+      latestBigIndex = i;
+      break;
+    }
+  }
+  return msgs.map((m, i) => {
+    if (m.role === "assistant" && m.content) {
+      return { ...m, content: null };
+    }
+    if (m.role === "tool" && m.name && BIG_PAGE_TOOLS.has(m.name) && i !== latestBigIndex) {
+      return { role: "tool", tool_call_id: m.tool_call_id, name: m.name, content: '"[已过期]"' };
+    }
+    if (m.role === "tool" && m.content && m.content.length > 12000) {
+      return { ...m, content: m.content.slice(0, 12000) + "…" };
+    }
+    return m;
+  });
+}
+
 export async function runToolLoop(
   config: LLMConfig,
   messages: ChatMessage[],
@@ -133,10 +157,11 @@ export async function runToolLoop(
   const { tools, execute, signal, maxSteps = 5, onStep } = options;
   const history = [...messages];
 
-  for (let step = 0; step < maxSteps; step++) {
+  const limit = maxSteps === 0 ? Number.MAX_SAFE_INTEGER : maxSteps;
+  for (let step = 0; step < limit; step++) {
     const assistant = await postChat(
       config,
-      { messages: history, tools, tool_choice: "auto" },
+      { messages: trimHistory(history), tools, tool_choice: "auto" },
       signal,
     );
     history.push(assistant);
