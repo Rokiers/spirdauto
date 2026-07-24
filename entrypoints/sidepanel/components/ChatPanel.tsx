@@ -195,11 +195,13 @@ export function ChatPanel() {
       await pcCall("showMask").catch(() => {});
       stepCountRef.current = 0;
       setStopReason("");
-      const doRecord = recordingRef.current; // 读取实时 ref，不用 state（避免闭包过期）
+      const doRecord = recordingRef.current;
+      const steps = doRecord ? 0 : 100;  // 未录制也提到 100 步
+      console.log("[ChatPanel] send", { doRecord, maxSteps: steps });
       const result = await runToolLoop(config, [SYSTEM_PROMPT, ...history], {
         tools: ALL_TOOLS,
         execute: executeTool,
-        maxSteps: doRecord ? 0 : 15,
+        maxSteps: steps,
         requireTools: doRecord,
         autoContinue: doRecord,
         onStep: (step) => {

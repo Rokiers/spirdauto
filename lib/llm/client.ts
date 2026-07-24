@@ -232,9 +232,14 @@ export async function runToolLoop(
     }
   }
 
-  console.log("[runToolLoop] 停止（达到最大步数）", { maxSteps, step: limit });
+  console.log("[runToolLoop] 停止（达到最大步数）", {
+    maxSteps,
+    limit,
+    step: limit,
+    actualStepsTaken: limit === Number.MAX_SAFE_INTEGER ? "unlimited" : limit,
+  });
   return {
     messages: history,
-    text: "（已达到最大工具调用步数，已停止）",
+    text: `（已达到最大工具调用步数，已停止）`,
   };
 }
