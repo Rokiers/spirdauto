@@ -152,26 +152,55 @@ export async function runToolLoop(
     signal?: AbortSignal;
     maxSteps?: number;
     requireTools?: boolean;
+    autoContinue?: boolean;
     onStep?: (step: ToolLoopStep) => void;
   },
 ): Promise<ToolLoopResult> {
-  const { tools, execute, signal, maxSteps = 5, requireTools, onStep } = options;
+  const { tools, execute, signal, maxSteps = 5, requireTools, autoContinue, onStep } = options;
   const history = [...messages];
+
+  let emptyStrikes = 0;
+  let triedRequired = false;
 
   const limit = maxSteps === 0 ? Number.MAX_SAFE_INTEGER : maxSteps;
   for (let step = 0; step < limit; step++) {
+    let tc: string | undefined = requireTools && !triedRequired ? "required" : undefined;
+    if (requireTools && triedRequired) tc = undefined; // fallback to auto
+
     const assistant = await postChat(
       config,
-      { messages: trimHistory(history), tools, tool_choice: requireTools ? "required" : "auto" },
+      { messages: trimHistory(history), tools, ...(tc ? { tool_choice: tc } : { tool_choice: "auto" }) },
       signal,
-    );
+    ).catch(async (err) => {
+      // 如果 tool_choice=required 不被支持（如某些新 flash 模型），回退为 auto
+      if (requireTools && !triedRequired && String(err).includes("tool_choice")) {
+        triedRequired = true;
+        const retry = await postChat(
+          config,
+          { messages: trimHistory(history), tools, tool_choice: "auto" },
+          signal,
+        );
+        return retry;
+      }
+      throw err;
+    });
     history.push(assistant);
     onStep?.({ kind: "assistant", message: assistant });
 
     const calls = assistant.tool_calls ?? [];
     if (calls.length === 0) {
+      if (autoContinue && emptyStrikes < 3) {
+        emptyStrikes++;
+        history.push({
+          role: "user",
+          content: "继续执行翻页和提取，直到所有页面完成。不要只说话不做事。",
+        });
+        onStep?.({ kind: "assistant", message: { role: "assistant", content: null } });
+        continue; // ← 重新请求 LLM
+      }
       return { messages: history, text: assistant.content ?? "" };
     }
+    emptyStrikes = 0;
 
     for (const call of calls) {
       onStep?.({ kind: "tool_call", call });
