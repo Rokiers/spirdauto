@@ -190,11 +190,13 @@ export function ChatPanel() {
 
     try {
       await pcCall("showMask").catch(() => {});
+      // deepseek-reasoner / thinking 模型不支持 tool_choice: required
+      const canForceTools = !config.model.includes("reasoner");
       await runToolLoop(config, [SYSTEM_PROMPT, ...history], {
         tools: ALL_TOOLS,
         execute: executeTool,
         maxSteps: recording ? 0 : 15,
-        requireTools: recording,
+        requireTools: recording && canForceTools,
         onStep: (step) => {
           if (step.kind === "assistant") {
             appendMsg(step.message);
