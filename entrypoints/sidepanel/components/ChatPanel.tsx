@@ -195,12 +195,13 @@ export function ChatPanel() {
       await pcCall("showMask").catch(() => {});
       stepCountRef.current = 0;
       setStopReason("");
+      const doRecord = recordingRef.current; // 读取实时 ref，不用 state（避免闭包过期）
       const result = await runToolLoop(config, [SYSTEM_PROMPT, ...history], {
         tools: ALL_TOOLS,
         execute: executeTool,
-        maxSteps: recording ? 0 : 15,
-        requireTools: recording,
-        autoContinue: recording,
+        maxSteps: doRecord ? 0 : 15,
+        requireTools: doRecord,
+        autoContinue: doRecord,
         onStep: (step) => {
           if (step.kind === "assistant") {
             stepCountRef.current++;
