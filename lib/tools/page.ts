@@ -178,6 +178,21 @@ export const PAGE_TOOLS: ToolDef[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "done",
+      description:
+        "所有任务已完成，结束采集。只有确认已提取全部所需数据后才调用。",
+      parameters: {
+        type: "object",
+        properties: {
+          summary: { type: "string", description: "简述完成了什么" },
+        },
+        required: ["summary"],
+      },
+    },
+  },
 ];
 
 export const PAGE_TOOL_NAMES = new Set(PAGE_TOOLS.map((t) => t.function.name));
@@ -280,6 +295,8 @@ export async function executePageTool(
         sample: rows.slice(0, 5),
       };
     }
+    case "done":
+      return { done: true, summary: args.summary };
     default:
       throw new Error(`未知页面工具: ${name}`);
   }

@@ -23,17 +23,14 @@ const SYSTEM_PROMPT: ChatMessage = {
     "2. 如果页面有分页器：识别下一页按钮，然后逐页点击+提取，直到最后一页\n" +
     "3. 如果页面是无限滚动：使用 scroll 滚动加载更多\n" +
     "4. 提取数据：extract_list(itemSelector, fields)\n" +
+    "5. 全部完成后必须调用 done 工具结束\n" +
     "\n" +
     "★ 翻页纪律（最高优先级）：\n" +
-    "- 每翻一页后立即 extract_list，然后继续翻下一页\n" +
-    "- 不要在中途停下来报告\"已抓了几页\"——继续翻直到检测不到下一页或达到最后一页\n" +
-    "- 发现\"下一页\"按钮消失了/变灰了，才是翻页结束\n" +
-    "- 分页数未知时，不停翻直到尽头\n" +
+    "- 每翻一页后立即 extract_list，然后继续翻下一页，绝不能只说话不做事\n" +
+    "- 在翻页过程中绝不要回复纯文本，必须每次响应都调用工具\n" +
+    "- 发现\"下一页\"按钮消失了/变灰了/已经是当前页，才是翻页结束，此时调用 done\n" +
     "\n" +
-    "数据纪律：\n" +
-    "- 数据必须通过 extract_list 收集，禁止直接读取文本罗列数值\n" +
-    "- 一次只做一个动作\n" +
-    "- 用中文简洁回答。不要重复汇报进度，继续执行直到任务完成。",
+    "数据纪律：数据必须通过 extract_list 收集，禁止直接读取文本罗列数值。用中文简洁回答。",
 };
 
 function truncate(s: string, n = 200): string {
@@ -74,6 +71,7 @@ export function ChatPanel() {
 
   function recordStep(name: string, argsJson: string, result: unknown) {
     if (!recordingRef.current) return;
+    if (name === "done" || name === "run_flow_test" || name === "get_page_elements" || name === "inspect_html") return;
     let a: Record<string, unknown> = {};
     try {
       a = JSON.parse(argsJson || "{}");
@@ -190,7 +188,8 @@ export function ChatPanel() {
       await runToolLoop(config, [SYSTEM_PROMPT, ...history], {
         tools: ALL_TOOLS,
         execute: executeTool,
-        maxSteps: recording ? 0 : 15,  // 录制时不限步数
+        maxSteps: recording ? 0 : 15,
+        requireTools: recording,
         onStep: (step) => {
           if (step.kind === "assistant") {
             appendMsg(step.message);

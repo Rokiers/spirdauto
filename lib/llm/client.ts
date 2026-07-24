@@ -151,17 +151,18 @@ export async function runToolLoop(
     execute: ToolExecutor;
     signal?: AbortSignal;
     maxSteps?: number;
+    requireTools?: boolean;
     onStep?: (step: ToolLoopStep) => void;
   },
 ): Promise<ToolLoopResult> {
-  const { tools, execute, signal, maxSteps = 5, onStep } = options;
+  const { tools, execute, signal, maxSteps = 5, requireTools, onStep } = options;
   const history = [...messages];
 
   const limit = maxSteps === 0 ? Number.MAX_SAFE_INTEGER : maxSteps;
   for (let step = 0; step < limit; step++) {
     const assistant = await postChat(
       config,
-      { messages: trimHistory(history), tools, tool_choice: "auto" },
+      { messages: trimHistory(history), tools, tool_choice: requireTools ? "required" : "auto" },
       signal,
     );
     history.push(assistant);
