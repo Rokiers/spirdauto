@@ -512,8 +512,24 @@ button.recording {
     border: 1px dashed var(--border);
     border-radius: 6px;
     padding: 4px 8px;
-    white-space: pre-wrap;
-    word-break: break-word;
     align-self: flex-start;
     max-width: 100%;
+}
+
+.tool-result summary {
+    cursor: pointer;
+    color: var(--accent);
+}
+
+.tool-body {
+    margin: 4px 0 0;
+    max-height: 240px;
+    overflow: auto;
+    font-size: 11px;
+    line-height: 1.3;
+    background: var(--accent-soft);
+    padding: 6px 8px;
+    border-radius: 4px;
+    white-space: pre-wrap;
+    word-break: break-all;
 }

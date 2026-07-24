@@ -59,6 +59,7 @@ export function ChatPanel() {
   const recordedRef = useRef<Step[]>([]);
   const recordingRef = useRef(false);
   const listRef = useRef<HTMLDivElement>(null);
+  const stepCountRef = useRef(0);
 
   function scrollToBottom() {
     requestAnimationFrame(() => {
@@ -190,6 +191,7 @@ export function ChatPanel() {
 
     try {
       await pcCall("showMask").catch(() => {});
+      stepCountRef.current = 0;
       await runToolLoop(config, [SYSTEM_PROMPT, ...history], {
         tools: ALL_TOOLS,
         execute: executeTool,
@@ -198,6 +200,7 @@ export function ChatPanel() {
         autoContinue: recording,
         onStep: (step) => {
           if (step.kind === "assistant") {
+            stepCountRef.current++;
             appendMsg(step.message);
           } else if (step.kind === "tool_result") {
             recordStep(
@@ -239,10 +242,15 @@ export function ChatPanel() {
       );
     }
     if (m.role === "tool") {
+      const raw = m.content ?? "";
+      let parsed: unknown = raw;
+      try { parsed = JSON.parse(raw); } catch { /* keep raw */ }
+      const display = typeof parsed === "object" ? JSON.stringify(parsed, null, 2) : raw;
       return (
-        <div key={i} className="tool-result">
-          ↳ {m.name} 结果：{truncate(m.content ?? "")}
-        </div>
+        <details key={i} className="tool-result">
+          <summary>↳ {m.name}</summary>
+          <pre className="tool-body">{truncate(display, 2000)}</pre>
+        </details>
       );
     }
     // assistant
@@ -271,7 +279,7 @@ export function ChatPanel() {
 
       {recording && (
         <div className="rec-banner">
-          ● 录制中 · 已记录 {recordCount} 步 · 点「停止」保存流程
+          ● 录制中 · 已执行 {stepCountRef.current} 步 · 已记录 {recordCount} 个动作 · 点「停止」保存
         </div>
       )}
 
