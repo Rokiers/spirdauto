@@ -273,6 +273,29 @@ export default defineUnlistedScript(() => {
           });
           break;
 
+        // ---------- 按选择器点击 ----------
+        case "clickBySelector": {
+          const sel = String(args?.selector ?? "");
+          const el = document.querySelector(sel) as HTMLElement | null;
+          if (!el) throw new Error(`未找到元素: ${sel}`);
+          await animateCursorTo(el);
+          await domClick(el);
+          const loc = buildLocator(el);
+          result = { success: true, message: `✅ Clicked ${sel}`, locator: loc, selector: sel };
+          break;
+        }
+        case "inputBySelector": {
+          const sel = String(args?.selector ?? "");
+          const text = String(args?.text ?? "");
+          const el = document.querySelector(sel) as HTMLElement | null;
+          if (!el) throw new Error(`未找到元素: ${sel}`);
+          await animateCursorTo(el);
+          await domInput(el, text);
+          const loc = buildLocator(el);
+          result = { success: true, message: `✅ Input ${sel}`, locator: loc, selector: sel };
+          break;
+        }
+
         // ---------- 重播 ----------
         case "replayClick": {
           const el = resolveLocator(args?.locator);

@@ -20,7 +20,10 @@ const SYSTEM_PROMPT: ChatMessage = {
     "\n" +
     "工作流程：\n" +
     "1. 用 get_page_elements / inspect_html 了解页面结构和加载方式\n" +
-    "2. 如果页面有分页器：识别下一页按钮，然后逐页点击+提取，直到最后一页\n" +
+    "2. 如果页面有分页器：先用 inspect_html(\"分页器选择器\") 看翻页结构，" +
+    "识别有多少页（data-pageamount）、当前页（data-current）、每页按钮（[data-page=\"N\"]），" +
+    "然后用 click_by_selector(\"[data-page=N]\") 逐页翻 + extract_list 提取，" +
+    "不要用 click_element 按序号翻页，序号会变、不可靠\n" +
     "3. 如果页面是无限滚动：使用 scroll 滚动加载更多\n" +
     "4. 提取数据：extract_list(itemSelector, fields)\n" +
     "5. 全部完成后必须调用 done 工具结束\n" +
@@ -81,6 +84,8 @@ export function ChatPanel() {
     const res = result as { locator?: Locator };
     let step: Step | null = null;
     if (name === "click_element" && res?.locator) {
+      step = { type: "click", locator: res.locator, note: res.locator.text };
+    } else if (name === "click_by_selector" && res?.locator) {
       step = { type: "click", locator: res.locator, note: res.locator.text };
     } else if (name === "input_text" && res?.locator) {
       step = { type: "input", locator: res.locator, text: String(a.text ?? "") };

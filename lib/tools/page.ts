@@ -69,6 +69,22 @@ export const PAGE_TOOLS: ToolDef[] = [
   {
     type: "function",
     function: {
+      name: "click_by_selector",
+      description:
+        "用 CSS 选择器直接定位并点击元素（不依赖序号）。适合分页器按钮（如 [data-page=\"5\"]）、" +
+        "或任何有稳定属性/class 的按钮。先用 inspect_html 找到正确的选择器。",
+      parameters: {
+        type: "object",
+        properties: {
+          selector: { type: "string", description: "CSS 选择器，如 [data-page=\"5\"]" },
+        },
+        required: ["selector"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "inspect_html",
       description:
         "查看当前页面的简化 HTML 结构（保留标签、class、id、href、src），用于分析列表/卡片的结构以便编写提取选择器。" +
@@ -241,6 +257,14 @@ export async function executePageTool(
         down: args.down !== false,
         numPages: Number(args.numPages ?? 0.7),
       });
+    }
+    case "click_by_selector": {
+      const res = await pcCall("clickBySelector", { selector: String(args.selector ?? "") });
+      return res;
+    }
+    case "input_by_selector": {
+      const res = await pcCall("inputBySelector", { selector: String(args.selector ?? ""), text: String(args.text ?? "") });
+      return res;
     }
     case "inspect_html": {
       return await pcCall("inspectHtml", { selector: args.selector });
