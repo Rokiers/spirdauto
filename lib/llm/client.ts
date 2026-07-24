@@ -189,8 +189,14 @@ export async function runToolLoop(
 
     const calls = assistant.tool_calls ?? [];
     if (calls.length === 0) {
+      console.warn(`[runToolLoop] 第${step}步：模型返回了文本但无工具调用`, {
+        content: assistant.content?.slice(0, 200),
+        autoContinue,
+        emptyStrikes,
+      });
       if (autoContinue && emptyStrikes < 3) {
         emptyStrikes++;
+        console.log(`[runToolLoop] 自动继续 #${emptyStrikes}`);
         history.push({
           role: "user",
           content: "继续执行翻页和提取，直到所有页面完成。不要只说话不做事。",
@@ -198,9 +204,15 @@ export async function runToolLoop(
         onStep?.({ kind: "assistant", message: { role: "assistant", content: null } });
         continue; // ← 重新请求 LLM
       }
+      console.log("[runToolLoop] 停止（模型返回文本+无工具调用）", {
+        step,
+        content: assistant.content?.slice(0, 200),
+        emptyStrikes,
+      });
       return { messages: history, text: assistant.content ?? "" };
     }
     emptyStrikes = 0;
+    console.log(`[runToolLoop] 第${step}步：${calls.length}个工具调用`, calls.map((c) => c.function.name));
 
     for (const call of calls) {
       onStep?.({ kind: "tool_call", call });
@@ -220,6 +232,7 @@ export async function runToolLoop(
     }
   }
 
+  console.log("[runToolLoop] 停止（达到最大步数）", { maxSteps, step: limit });
   return {
     messages: history,
     text: "（已达到最大工具调用步数，已停止）",

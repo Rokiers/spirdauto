@@ -60,6 +60,8 @@ export function ChatPanel() {
   const recordingRef = useRef(false);
   const listRef = useRef<HTMLDivElement>(null);
   const stepCountRef = useRef(0);
+  const stopReasonRef = useRef("");
+  const [stopReason, setStopReason] = useState("");
 
   function scrollToBottom() {
     requestAnimationFrame(() => {
@@ -192,7 +194,8 @@ export function ChatPanel() {
     try {
       await pcCall("showMask").catch(() => {});
       stepCountRef.current = 0;
-      await runToolLoop(config, [SYSTEM_PROMPT, ...history], {
+      setStopReason("");
+      const result = await runToolLoop(config, [SYSTEM_PROMPT, ...history], {
         tools: ALL_TOOLS,
         execute: executeTool,
         maxSteps: recording ? 0 : 15,
@@ -217,6 +220,10 @@ export function ChatPanel() {
           }
         },
       });
+      // 停止原因显示
+      if (result.text) {
+        setStopReason(`[${stepCountRef.current}步] ${result.text}`);
+      }
     } catch (e) {
       setError(`请求失败：${String(e)}`);
     } finally {
@@ -291,6 +298,7 @@ export function ChatPanel() {
         )}
         {messages.map(renderMsg)}
         {sending && <div className="msg assistant thinking">执行中…</div>}
+        {stopReason && !sending && <div className="status info">{stopReason}</div>}
       </div>
 
       {error && <div className="error">{error}</div>}
