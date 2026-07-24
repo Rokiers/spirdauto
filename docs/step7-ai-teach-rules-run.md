@@ -47,7 +47,9 @@
 
 ### 2.2 教学阶段不限制 maxSteps
 - AI 可以慢慢看、多试几次，只要最终产出正确的 Flow
-- 上下文问题通过**历史裁剪**（旧页面快照替换为占位符）解决
+- 上下文问题通过**历史裁剪**解决：**只保留"产出"（工具结果），剔除"思考"（assistant 文本）**
+  - 裁剪规则：assistant 消息仅保留 `tool_calls`，去掉 `content` 文本；对 `get_page_elements`/`inspect_html` 的结果，旧快照替换为占位符 `"[已过期]"`，只保留最新一份
+  - 这样上下文中 95% 都是"数据结果"，10 步和 40 步的 token 开销几乎相同
 
 ### 2.3 产出的 Flow 完全不依赖 AI
 - 滚动 → `scrollCollect` 函数原语（边滚边取 + 去重，直到不再增长）
@@ -74,6 +76,25 @@
 | `input_text(index,text)` | 动作（录） | 输入，同时生成耐用 locator |
 | `scroll(down,numPages)` | 动作（录） | 教学期滚动探索页面 |
 | `extract_list(itemSelector,fields)` | 动作（录+数据） | 选择器提取数据并入库 |
+
+### 3.1 AI 自校验工具
+教学中 AI 产出 Flow 后，需要自己去页面跑一遍、对比数据、确认正确：
+- `run_flow_test(flow)`：教学阶段跑一遍刚产出的 Flow → 返回样本行
+- AI 拿到样本后对照页面：不吻合则调选择器 / 调字段取值 → 再跑再验 → 直到匹配
+
+```
+AI 自校验流程:
+  ① AI 构建 Flow（含 extract/fetchJson/scollCollect 等步骤）
+  ② 调用 run_flow_test(Flow) → 执行一遍，拿到前几行样本
+  ③ AI 对照当前页面：「第一条名称是X，对上了」「价格是Y，也对上了」
+  ④ 若不对 → 调整选择器 → 更新 Flow → 再跑再验
+  ⑤ 全部对上 → Flow 校验通过，保存
+```
+
+### 3.2 场景通用性
+- 无限滚动只是一个具体场景，和"分页器""多静态页""进入即全量""接口驱动"并列
+- 处理流程统一：AI 识别属哪种 → 选对应原语 → 填参数 → 校验 → 生成 Flow
+- 不针对某一个页面做特殊优化
 
 ---
 
@@ -118,14 +139,14 @@ AI 步骤（教学，不限步数）:
 
 ## 6. 具体实现计划
 
-### 6.1 历史裁剪 + 无限制 maxSteps（先做，解决基础问题）
-- `runToolLoop` 加 `trimHistory`：检测 `get_page_elements`/`inspect_html` 的 tool 消息，旧的替换为 `"[已过期]"`
+### 6.1 历史裁剪 + 不限制 maxSteps（先做，解决基础问题）
+- `runToolLoop` 加 `trimHistory`：assistant 消息仅保留 `tool_calls`（去掉 `content` 文本）；旧 `get_page_elements`/`inspect_html` 结果替换为 `"[已过期]"`
 - `get_page_elements` 内容硬上限：约 8000 字符 / 100 元素
 - 录制模式下 **maxSteps 移除或设为极大值**，靠超上下文兜底 + 裁剪保证不崩
 
 ### 6.2 接口引擎（核心新增）
 - 主世界 monkey-patch：`startIntercept / stopIntercept / getIntercepted`
-- 工具：`start_intercept / stop_intercept / get_intercepted / fetch_json`
+- 工具：`start_intercept / stop_intercept / get_intercepted / fetch_json / run_flow_test`
 - Flow 新增 `fetchJson` 步
 - 重播支持
 
@@ -135,7 +156,11 @@ AI 步骤（教学，不限步数）:
 - `forEachPage` 原语（URL 列表 / 逐个点按钮）
 - Flow 类型扩展，replay 新增处理
 
-### 6.4 录制校验
+### 6.4 AI 自校验
+- 新增 `run_flow_test` 工具：教学中 AI 产出的 Flow 本地执行一遍 → 返回样本
+- 系统提示教 AI：产出 Flow 后必须运行校验，不匹配则重新调整
+
+### 6.5 录制校验
 - 停止录制时，如果没录到 `extract / fetchJson / scrollCollect / paginate / forEachPage` 任一数据步，警告"未录到数据采集步骤，重播不会产出数据"
 
 ### 6.5 滚动 → 函数（而非工具调用）
@@ -169,7 +194,7 @@ step6 的接口引擎 / DOM 引擎 / 结构化采集的具体实现方案不变�
 
 ## 9. 待定事项
 
-- 教学阶段如果 AI 中途犯错（认错结构、写出错误选择器），目前只能靠人工判断+重新录制。未来可做"试提取后确认字段"的确认步骤。
-- monkey-patch 拦截时可能包括广告/分析/静态资源 URL，去重和滤噪需要验证。
-- 结构化原语内部的错误处理（如某页请求失败、某条滚动无新数据但有网络波动）需要定义清楚行为。
-- 大型站点多类型多页面的采集（列表页→详情页→列表页交替），当前 forEachPage 原语可以处理列表-详情模式，但对嵌套更深的场景（详情页里还有子列表）需评估扩展性。
+- `run_flow_test` 工具是在 sidepanel 本地执行还是需要主世界配合？倾向于本地（直接调 replay.ts），但跨页导航 Flow 需等页面加载完毕后恢复执行
+- monkey-patch 拦截时可能包括广告/分析/静态资源 URL，去重和滤噪需要验证
+- 结构化原语内部的错误处理（如某页请求失败、某条滚动无新数据但有网络波动）需定义清楚
+- 大型站点多类型多页面的采集（列表页→详情页→列表页交替）需评估 forEachPage 对嵌套子列表的扩展性
