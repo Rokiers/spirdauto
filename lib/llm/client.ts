@@ -150,20 +150,19 @@ export async function runToolLoop(
     tools: ToolDef[];
     execute: ToolExecutor;
     signal?: AbortSignal;
-    maxSteps?: number;
     requireTools?: boolean;
     autoContinue?: boolean;
     onStep?: (step: ToolLoopStep) => void;
   },
 ): Promise<ToolLoopResult> {
-  const { tools, execute, signal, maxSteps = 5, requireTools, autoContinue, onStep } = options;
+  const { tools, execute, signal, requireTools, autoContinue, onStep } = options;
   const history = [...messages];
 
   let emptyStrikes = 0;
   let triedRequired = false;
+  let step = 0;
 
-  const limit = maxSteps === 0 ? Number.MAX_SAFE_INTEGER : maxSteps;
-  for (let step = 0; step < limit; step++) {
+  for (;;) {
     let tc: string | undefined = requireTools && !triedRequired ? "required" : undefined;
     if (requireTools && triedRequired) tc = undefined; // fallback to auto
 
@@ -231,15 +230,4 @@ export async function runToolLoop(
       });
     }
   }
-
-  console.log("[runToolLoop] 停止（达到最大步数）", {
-    maxSteps,
-    limit,
-    step: limit,
-    actualStepsTaken: limit === Number.MAX_SAFE_INTEGER ? "unlimited" : limit,
-  });
-  return {
-    messages: history,
-    text: `（已达到最大工具调用步数，已停止）`,
-  };
 }

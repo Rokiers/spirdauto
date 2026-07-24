@@ -196,12 +196,10 @@ export function ChatPanel() {
       stepCountRef.current = 0;
       setStopReason("");
       const doRecord = recordingRef.current;
-      const steps = doRecord ? 0 : 100;  // 未录制也提到 100 步
-      console.log("[ChatPanel] send", { doRecord, maxSteps: steps });
+      console.log("[ChatPanel] send", { doRecord });
       const result = await runToolLoop(config, [SYSTEM_PROMPT, ...history], {
         tools: ALL_TOOLS,
         execute: executeTool,
-        maxSteps: steps,
         requireTools: doRecord,
         autoContinue: doRecord,
         onStep: (step) => {
