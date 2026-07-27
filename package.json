@@ -20,6 +20,7 @@
     "zod": "^4.4.0"
   },
   "devDependencies": {
+    "@svgr/rollup": "^8.1.0",
     "@types/chrome": "^0.2.0",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
