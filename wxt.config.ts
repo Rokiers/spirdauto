@@ -1,10 +1,10 @@
 import { defineConfig } from 'wxt';
-import svgr from '@svgr/rollup';
+import svgrPlugin from 'vite-plugin-svgr';
 
 export default defineConfig({
   modules: ['@wxt-dev/module-react'],
   vite: () => ({
-    plugins: [svgr({ svgo: false, ref: true, titleProp: true })],
+    plugins: [svgrPlugin()],
   }),
   manifest: {
     name: 'SpirdAuto',
