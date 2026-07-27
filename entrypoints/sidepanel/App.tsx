@@ -3,11 +3,11 @@ import { ChatPanel } from "./components/ChatPanel";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { FlowPanel } from "./components/FlowPanel";
 import { DataPanel } from "./components/DataPanel";
-
 import HomeIcon from "./icons/home.svg?react";
 import FlowIcon from "./icons/flow.svg?react";
 import DataIcon from "./icons/data.svg?react";
 import GearIcon from "./icons/gear.svg?react";
+import styles from "./App.module.css";
 
 type TabKey = "home" | "flow" | "data" | "settings";
 
@@ -20,9 +20,12 @@ export function App() {
     setEverSeen((s) => new Set(s).add(t));
   }
 
+  const btnCls = (t: TabKey) =>
+    `${styles.tabbarBtn} ${activeTab === t ? styles.active : ""}`;
+
   return (
-    <div className="app">
-      <main className="content">
+    <div className={styles.app}>
+      <main className={styles.content}>
         <div hidden={activeTab !== "home"}>
           {everSeen.has("home") && <ChatPanel />}
         </div>
@@ -37,17 +40,17 @@ export function App() {
         </div>
       </main>
 
-      <nav className="tabbar">
-        <button className={activeTab === "home" ? "tabbar-btn active" : "tabbar-btn"} onClick={() => show("home")}>
+      <nav className={styles.tabbar}>
+        <button className={btnCls("home")} onClick={() => show("home")}>
           <HomeIcon /><span>首页</span>
         </button>
-        <button className={activeTab === "flow" ? "tabbar-btn active" : "tabbar-btn"} onClick={() => show("flow")}>
+        <button className={btnCls("flow")} onClick={() => show("flow")}>
           <FlowIcon /><span>流程</span>
         </button>
-        <button className={activeTab === "data" ? "tabbar-btn active" : "tabbar-btn"} onClick={() => show("data")}>
+        <button className={btnCls("data")} onClick={() => show("data")}>
           <DataIcon /><span>数据</span>
         </button>
-        <button className={activeTab === "settings" ? "tabbar-btn active" : "tabbar-btn"} onClick={() => show("settings")}>
+        <button className={btnCls("settings")} onClick={() => show("settings")}>
           <GearIcon /><span>设置</span>
         </button>
       </nav>

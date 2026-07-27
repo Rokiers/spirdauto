@@ -1,0 +1,33 @@
+.form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.formRow {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.formRow :global(.label) {
+    width: auto;
+}
+
+.modelRow {
+    display: flex;
+    gap: 6px;
+}
+
+.modelRow select {
+    flex: 1;
+}
+
+.modelRow button {
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.pad {
+    padding: 0 12px;
+}

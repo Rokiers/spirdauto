@@ -1,0 +1,60 @@
+.app {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.content {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.content > div {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 12px 0;
+}
+
+.content > div[hidden] {
+    display: none !important;
+}
+
+.tabbar {
+    display: flex;
+    flex-shrink: 0;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+}
+
+.tabbarBtn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 4px 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    color: var(--muted);
+    font-size: 10px;
+}
+
+.tabbarBtn:hover {
+    color: var(--accent);
+    background: var(--accent-soft);
+}
+
+.tabbarBtn svg {
+    width: 16px;
+    height: 16px;
+}
+
+.active {
+    color: var(--accent);
+}

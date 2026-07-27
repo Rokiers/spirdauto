@@ -1,0 +1,34 @@
+.wrap {
+    overflow: auto;
+    max-height: 60vh;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+}
+
+.table {
+    border-collapse: collapse;
+    font-size: 12px;
+    width: 100%;
+}
+
+.table th,
+.table td {
+    border: 1px solid var(--border);
+    padding: 4px 8px;
+    text-align: left;
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.table th {
+    background: var(--accent-soft);
+    color: var(--accent);
+    position: sticky;
+    top: 0;
+}
+
+.pad {
+    padding: 0 12px;
+}

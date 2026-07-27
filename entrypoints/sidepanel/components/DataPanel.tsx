@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { loadDataset, clearDataset, columnsOf, type DataRow } from "@/lib/data/store";
 import { downloadCsv } from "@/lib/data/csv";
+import styles from "./DataPanel.module.css";
 
 export function DataPanel() {
   const [rows, setRows] = useState<DataRow[]>([]);
@@ -23,10 +24,10 @@ export function DataPanel() {
   const preview = rows.slice(0, 200);
 
   return (
-    <section className="data">
+    <section className={styles.pad}>
       <div className="section-head">
         <h2>已收集数据（{rows.length}）</h2>
-        <div className="chat-actions">
+        <div style={{ display: "flex", gap: 6 }}>
           <button onClick={refresh}>刷新</button>
           <button disabled={rows.length === 0} onClick={() => downloadCsv(rows)}>
             导出 CSV
@@ -42,8 +43,8 @@ export function DataPanel() {
           暂无数据。到「首页」让 AI 用 extract_list 提取，或运行含 extract 的流程后回到这里。
         </p>
       ) : (
-        <div className="table-wrap">
-          <table className="data-table">
+        <div className={styles.wrap}>
+          <table className={styles.table}>
             <thead>
               <tr>
                 {cols.map((c) => (

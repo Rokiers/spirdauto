@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { loadFlows, deleteFlow } from "@/lib/flow/store";
 import { replayFlow } from "@/lib/flow/replay";
 import type { Flow } from "@/lib/flow/types";
+import styles from "./FlowPanel.module.css";
 
 export function FlowPanel() {
   const [flows, setFlows] = useState<Flow[]>([]);
@@ -57,16 +58,16 @@ export function FlowPanel() {
         </p>
       )}
 
-      <ul className="flow-list">
+      <ul className={styles.list}>
         {flows.map((f) => (
-          <li key={f.id} className="flow-item">
-            <div className="flow-info">
-              <div className="flow-name">{f.name}</div>
-              <div className="flow-meta">
+          <li key={f.id} className={styles.item}>
+            <div>
+              <div className={styles.name}>{f.name}</div>
+              <div className={styles.meta}>
                 {f.steps.length} 步 · {f.match.domain || "任意站点"}
               </div>
             </div>
-            <div className="flow-actions">
+            <div className={styles.actions}>
               <button
                 className="primary"
                 disabled={running === f.id}

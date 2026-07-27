@@ -5,6 +5,7 @@ import { PAGE_TOOLS, PAGE_TOOL_NAMES, executePageTool } from "@/lib/tools/page";
 import { pcCall } from "@/lib/pc";
 import { saveFlow } from "@/lib/flow/store";
 import type { Flow, Step, Locator, ExtractField } from "@/lib/flow/types";
+import styles from "./ChatPanel.module.css";
 
 const ALL_TOOLS = [...BROWSER_TOOLS, ...PAGE_TOOLS];
 
@@ -251,7 +252,7 @@ export function ChatPanel() {
   function renderMsg(m: ChatMessage, i: number) {
     if (m.role === "user") {
       return (
-        <div key={i} className="msg user">
+        <div key={i} className={`${styles.msg} ${styles.msgUser}`}>
           {m.content}
         </div>
       );
@@ -262,21 +263,21 @@ export function ChatPanel() {
       try { parsed = JSON.parse(raw); } catch { /* keep raw */ }
       const display = typeof parsed === "object" ? JSON.stringify(parsed, null, 2) : raw;
       return (
-        <details key={i} className="tool-result">
+        <details key={i} className={styles.toolResult}>
           <summary>↳ {m.name}</summary>
-          <pre className="tool-body">{truncate(display, 2000)}</pre>
+          <pre className={styles.toolBody}>{truncate(display, 2000)}</pre>
         </details>
       );
     }
     // assistant
     return (
-      <div key={i} className="assistant-turn">
-        {m.content && <div className="msg assistant">{m.content}</div>}
+      <div key={i} className={styles.assistantTurn}>
+        {m.content && <div className={`${styles.msg} ${styles.msgAssistant}`}>{m.content}</div>}
         {m.tool_calls?.map((c) => (
-          <div key={c.id} className="tool-step">
+          <div key={c.id} className={styles.toolStep}>
             🔧 {c.function.name}
             {compactArgs(c.function.arguments) && (
-              <span className="tool-args">({compactArgs(c.function.arguments)})</span>
+              <span className={styles.toolArgs}>({compactArgs(c.function.arguments)})</span>
             )}
           </div>
         ))}
@@ -285,33 +286,33 @@ export function ChatPanel() {
   }
 
   return (
-    <section className="chat">
-      <div className="chat-actions">
+    <section className={styles.chat}>
+      <div className={styles.actions}>
         {messages.length > 0 && (
           <button onClick={() => setMessages([])}>清空</button>
         )}
       </div>
 
       {recording && (
-        <div className="rec-banner">
+        <div className={styles.recBanner}>
           ● 录制中 · 已执行 {stepCountRef.current} 步 · 已记录 {recordCount} 个动作 · 点「停止」保存
         </div>
       )}
 
-      <div className="msg-list" ref={listRef}>
+      <div className={styles.msgList} ref={listRef}>
         {messages.length === 0 && (
           <p className="hint">
             打开一个网页，让 AI 分析页面并提取数据。
           </p>
         )}
         {messages.map(renderMsg)}
-        {sending && <div className="msg assistant thinking">执行中…</div>}
+        {sending && <div className={`${styles.msg} ${styles.msgAssistant} ${styles.msgThinking}`}>执行中…</div>}
         {stopReason && !sending && <div className="status info">{stopReason}</div>}
       </div>
 
       {error && <div className="error">{error}</div>}
 
-      <div className="send-row">
+      <div className={styles.sendRow}>
         <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
@@ -320,7 +321,7 @@ export function ChatPanel() {
           rows={1}
         />
         {recording ? (
-          <button className="recording" onClick={stopRecording}>
+          <button className={styles.recordingBtn} onClick={stopRecording}>
             ● 停止 ({recordCount})
           </button>
         ) : (

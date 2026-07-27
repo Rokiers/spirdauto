@@ -7,6 +7,7 @@ import {
   listModels,
   type LLMConfig,
 } from "@/lib/llm";
+import styles from "./SettingsPanel.module.css";
 
 type Status = { kind: "ok" | "err" | "info"; msg: string } | null;
 
@@ -89,13 +90,13 @@ export function SettingsPanel() {
       : "（无）";
 
   return (
-    <section className="settings">
+    <section className={`${styles.pad} ${styles.form}`}>
       <div className="section-head">
         <h2>模型设置</h2>
       </div>
 
-      <div className="form">
-        <label className="form-row">
+      <div className={styles.form}>
+        <label className={styles.formRow}>
           <span className="label">服务商</span>
           <select
             value={config.providerId}
@@ -109,7 +110,7 @@ export function SettingsPanel() {
           </select>
         </label>
 
-        <label className="form-row">
+        <label className={styles.formRow}>
           <span className="label">API Key</span>
           <input
             type="password"
@@ -125,7 +126,7 @@ export function SettingsPanel() {
           </a>
         )}
 
-        <label className="form-row">
+        <label className={styles.formRow}>
           <span className="label">模型</span>
           <select
             value={config.model}
@@ -141,7 +142,7 @@ export function SettingsPanel() {
           </select>
         </label>
 
-        <div className="send-row">
+        <div>
           <button className="primary" onClick={save}>
             保存
           </button>
