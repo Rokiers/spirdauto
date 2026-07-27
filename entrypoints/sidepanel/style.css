@@ -87,6 +87,15 @@ body {
     height: 16px;
 }
 
+.tab-icon {
+    display: inline-flex;
+}
+
+.tab-icon svg {
+    width: 16px;
+    height: 16px;
+}
+
 .tabbar-btn:hover {
     color: var(--accent);
     background: var(--accent-soft);
